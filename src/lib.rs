@@ -15,68 +15,72 @@ pub enum Waveform {
     Triangle,
 }
 
+impl Waveform {
+    pub fn sample(&self, freq: f32, rate: f32, clock: f32) -> f32 {
+        use Waveform::*;
+
+        match self {
+            Sine => Self::sine(freq, rate, clock),
+            Square => Self::generative(2, 1.0, freq, rate, clock),
+            Saw => Self::generative(1, 1.0, freq, rate, clock),
+            Triangle => Self::generative(2, 2.0, freq, rate, clock),
+        }
+    }
+
+    // Pure sinusoidal waveform.
+    fn sine(freq: f32, rate: f32, clock: f32) -> f32 {
+        use std::f32::consts::TAU;
+
+        (clock * freq * TAU / rate).sin()
+    }
+
+    /// Generative waveform.
+    fn generative(harmonic_inc: u32, gain_exp: f32, freq: f32, rate: f32, clock: f32) -> f32 {
+        let mut output = 0.0;
+
+        let mut i = 1;
+        while !Self::is_multiple_of_freq_above_nyquist(i, freq, rate) {
+            let gain = 1.0 / (i as f32).powf(gain_exp);
+            output += gain * Self::sine(freq * i as f32, rate, clock);
+            i += harmonic_inc;
+        }
+
+        output
+    }
+
+    fn is_multiple_of_freq_above_nyquist(multiple: u32, freq: f32, rate: f32) -> bool {
+        freq * (multiple as f32) > rate / 2.0
+    }
+}
+
 pub struct Oscillator {
-    pub sample_rate: f32,
     pub waveform: Waveform,
-    pub current_sample_index: f32,
-    pub frequency_hz: f32,
+    pub freq: f32,
+    pub rate: f32,
+    pub clock: f32,
 }
 
 impl Oscillator {
-    fn advance_sample(&mut self) {
-        self.current_sample_index = (self.current_sample_index + 1.0) % self.sample_rate;
-    }
-
     pub fn set_waveform(&mut self, waveform: Waveform) {
         self.waveform = waveform;
     }
 
-    fn calculate_sine_output_from_freq(&self, freq: f32) -> f32 {
-        let two_pi = 2.0 * std::f32::consts::PI;
-        (self.current_sample_index * freq * two_pi / self.sample_rate).sin()
+    fn tick(&mut self) {
+        self.clock = (self.clock + 1.0) % self.rate;
     }
 
-    fn is_multiple_of_freq_above_nyquist(&self, multiple: f32) -> bool {
-        self.frequency_hz * multiple > self.sample_rate / 2.0
-    }
+    pub fn sample(&mut self) -> f32 {
+        self.tick();
 
-    fn sine_wave(&mut self) -> f32 {
-        self.advance_sample();
-        self.calculate_sine_output_from_freq(self.frequency_hz)
+        self.waveform.sample(self.freq, self.rate, self.clock)
     }
+}
 
-    fn generative_waveform(&mut self, harmonic_index_increment: i32, gain_exponent: f32) -> f32 {
-        self.advance_sample();
-        let mut output = 0.0;
-        let mut i = 1;
-        while !self.is_multiple_of_freq_above_nyquist(i as f32) {
-            let gain = 1.0 / (i as f32).powf(gain_exponent);
-            output += gain * self.calculate_sine_output_from_freq(self.frequency_hz * i as f32);
-            i += harmonic_index_increment;
-        }
-        output
-    }
+impl Iterator for Oscillator {
+    type Item = f32;
 
-    fn square_wave(&mut self) -> f32 {
-        self.generative_waveform(2, 1.0)
-    }
-
-    fn saw_wave(&mut self) -> f32 {
-        self.generative_waveform(1, 1.0)
-    }
-
-    fn triangle_wave(&mut self) -> f32 {
-        self.generative_waveform(2, 2.0)
-    }
-
-    pub fn tick(&mut self) -> f32 {
-        self.advance_sample();
-        match self.waveform {
-            Waveform::Sine => self.sine_wave(),
-            Waveform::Square => self.square_wave(),
-            Waveform::Saw => self.saw_wave(),
-            Waveform::Triangle => self.triangle_wave(),
-        }
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.sample())
     }
 }
 
