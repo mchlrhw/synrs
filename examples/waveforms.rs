@@ -27,7 +27,7 @@ fn main() -> anyhow::Result<()> {
         // Every second, change the waveform
         let elapsed = start_time.elapsed().as_secs();
         if elapsed > previous_elapsed {
-            oscillator.set_waveform(*waveforms.next().unwrap());
+            oscillator.waveform = *waveforms.next().unwrap();
             previous_elapsed = elapsed
         }
     }

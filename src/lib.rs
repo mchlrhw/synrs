@@ -61,10 +61,6 @@ pub struct Oscillator {
 }
 
 impl Oscillator {
-    pub fn set_waveform(&mut self, waveform: Waveform) {
-        self.waveform = waveform;
-    }
-
     fn tick(&mut self) {
         self.clock = (self.clock + 1.0) % self.rate;
     }
