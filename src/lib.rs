@@ -2,6 +2,7 @@ use cpal::{
     traits::{DeviceTrait, HostTrait, StreamTrait},
     FromSample, Sample, SizedSample,
 };
+use rand::{thread_rng, Rng};
 use std::{
     sync::mpsc::{self, Receiver, SyncSender},
     thread,
@@ -62,7 +63,7 @@ pub struct Oscillator {
 
 impl Oscillator {
     fn tick(&mut self) {
-        self.clock = (self.clock + 1.0) % self.rate;
+        self.clock = self.clock + 1.0;
     }
 
     pub fn sample(&mut self) -> f32 {
@@ -73,6 +74,22 @@ impl Oscillator {
 }
 
 impl Iterator for Oscillator {
+    type Item = f32;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(self.sample())
+    }
+}
+
+pub struct WhiteNoise;
+
+impl WhiteNoise {
+    pub fn sample(&self) -> f32 {
+        thread_rng().gen_range(-1.0..=1.0)
+    }
+}
+
+impl Iterator for WhiteNoise {
     type Item = f32;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -137,7 +154,7 @@ where
         let stream = device.build_output_stream(
             &config,
             move |output: &mut [T], _: &cpal::OutputCallbackInfo| {
-                process_frame(output, num_channels, &samples_rcv)
+                process_frame(output, num_channels, &samples_rcv);
             },
             err_fn,
             None,
